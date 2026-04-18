@@ -170,15 +170,16 @@ python -m mean_reversion.cli --strategy mean_reversion_fast_exit
 
 Expected CLI behavior:
 
-- `--strategy` is required unless a clear default is intentionally chosen
+- `--strategy` is required
 - invalid strategy names fail with a helpful error listing valid strategies
 - each strategy runs with its own hardcoded defaults
 - no per-run threshold overrides are supported in this phase
 
-Recommended default behavior:
+Recommended missing-flag behavior:
 
-- allow a default of `mean_reversion_v1` for convenience
-- still expose `--strategy` so explicit selection is easy and scriptable
+- if `--strategy` is omitted, fail with a clear error
+- the error should suggest `mean_reversion_v1` as the first strategy to try
+- the CLI should not silently choose a strategy on the user's behalf
 
 Internal file organization should be nested by strategy family even if the CLI names stay flat. For example:
 
