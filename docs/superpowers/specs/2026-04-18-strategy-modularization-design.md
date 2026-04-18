@@ -96,11 +96,14 @@ src/mean_reversion/
 
   strategies/
     __init__.py
-    base.py
     registry.py
-    mean_reversion_v1.py
-    mean_reversion_strict.py
-    mean_reversion_fast_exit.py
+
+    mean_reversion/
+      __init__.py
+      base.py
+      v1.py
+      strict.py
+      fast_exit.py
 ```
 
 ### Responsibilities
@@ -111,14 +114,16 @@ src/mean_reversion/
   Parses `--strategy`, resolves it through the registry, downloads data, prepares frames, runs the engine, and writes reports.
 - `indicators.py`
   Remains a shared library of reusable indicator helpers.
-- `strategies/base.py`
-  Defines the strategy contract.
 - `strategies/registry.py`
   Maps CLI names to strategy implementations.
-- `strategies/mean_reversion_v1.py`
+- `strategies/mean_reversion/base.py`
+  Defines the strategy contract and any mean-reversion-family shared helpers.
+- `strategies/mean_reversion/v1.py`
   Contains the current ETF mean reversion logic as the baseline strategy.
-- Other files in `strategies/`
-  Contain named rule variants with different hardcoded defaults or rule details.
+- Other files in `strategies/mean_reversion/`
+  Contain named mean reversion rule variants with different hardcoded defaults or rule details.
+- Future non-mean-reversion families
+  Should live in sibling directories such as `strategies/breakout/` rather than flattening all strategy files into one directory.
 
 ## Strategy Contract
 
@@ -174,6 +179,13 @@ Recommended default behavior:
 
 - allow a default of `mean_reversion_v1` for convenience
 - still expose `--strategy` so explicit selection is easy and scriptable
+
+Internal file organization should be nested by strategy family even if the CLI names stay flat. For example:
+
+- CLI name: `mean_reversion_v1`
+- module path: `mean_reversion.strategies.mean_reversion.v1`
+
+This keeps the user-facing interface simple while preventing the `strategies/` package from becoming a flat list of unrelated modules as more families are added.
 
 ## Data Flow
 
@@ -283,9 +295,10 @@ These costs are acceptable because they directly support the current need withou
 Proceed with a focused refactor that introduces:
 
 - a `strategies/` package
+- a `strategies/mean_reversion/` family package
 - a small strategy interface
 - a strategy registry
 - CLI `--strategy` selection
-- extraction of the current strategy into `mean_reversion_v1`
+- extraction of the current strategy into `strategies/mean_reversion/v1.py`
 
 Do not change sizing, portfolio rules, execution semantics, or reporting structure in the same refactor unless required by the new strategy boundary.
