@@ -6,7 +6,7 @@
 
 ## Goal
 
-Add a durable results-saving model that stores strategy backtest outputs in a way that supports both fast text review and static visual presentation. The first version should save immutable run bundles on disk, organize them primarily by strategy, and generate both human-readable summaries and a browser-openable HTML report from the same underlying run data.
+Add a durable results-saving model that stores strategy backtest outputs in a way that supports both fast text review and static visual presentation without bloating storage when repeated runs produce identical results. The first version should save canonical run bundles on disk, keep a lightweight audit history for every execution attempt, organize results primarily by strategy, and generate both human-readable summaries and a browser-openable HTML report from the same underlying run data.
 
 ## Why This Change
 
@@ -32,7 +32,8 @@ So the system needs a durable way to preserve and review runs, not just overwrit
 
 ### In Scope
 
-- Save each run as a timestamped immutable bundle on disk
+- Save each unique result as a canonical bundle on disk
+- Record every execution attempt in lightweight audit history
 - Organize results by strategy first
 - Use a composite second-level bucket of `market__instrument_type__source`
 - Generate both structured and human-readable outputs for each run
@@ -53,7 +54,7 @@ So the system needs a durable way to preserve and review runs, not just overwrit
 
 Use the filesystem as the source of truth.
 
-Each run should produce a self-contained bundle that includes:
+Each unique result should produce a self-contained canonical bundle that includes:
 
 - run metadata
 - structured summary metrics
@@ -61,7 +62,9 @@ Each run should produce a self-contained bundle that includes:
 - a markdown summary for text review
 - a static HTML report for visual review
 
-This keeps the first version simple, transparent, and easy to inspect with normal tools while leaving room for future indexing or aggregation later.
+Each execution attempt should also produce a lightweight audit record so reruns are visible without forcing duplicate bundles to be written.
+
+This keeps the first version simple, transparent, and easy to inspect with normal tools while avoiding unnecessary storage growth from identical reruns.
 
 ## Storage Hierarchy
 
@@ -71,8 +74,11 @@ Results should be stored under a new top-level `results/` directory with this hi
 results/
   <strategy>/
     <market>__<instrument_type>__<source>/
+      bundles/
+        <fingerprint>/
+      history/
+        <timestamp>.json
       latest/
-      <timestamp>/
 ```
 
 Example:
@@ -81,21 +87,32 @@ Example:
 results/
   mean_reversion_v1/
     us__etf__yfinance/
+      bundles/
+        a1b2c3d4/
+      history/
+        2026-04-18T14-10-00.json
       latest/
-      2026-04-18T14-10-00/
     us__etf__csv/
+      bundles/
+        e5f6g7h8/
+      history/
+        2026-04-18T15-00-00.json
       latest/
-      2026-04-18T15-00-00/
     cn__equity__parquet/
+      bundles/
+        i9j0k1l2/
+      history/
+        2026-04-19T09-00-00.json
       latest/
-      2026-04-19T09-00-00/
 ```
 
 ## Why This Hierarchy
 
 - `strategy` is the top-level key because that is the main research unit you will browse by.
 - `market__instrument_type__source` defines the comparable run bucket.
-- `timestamp` provides immutable history within that bucket.
+- `bundles/` holds canonical unique result payloads.
+- `history/` provides immutable execution history within that bucket.
+- `latest/` gives a fast view of the latest resolved result.
 
 This avoids a deeper nested tree like `strategy/market/instrument/source/timestamp`, which would add directory depth without providing much extra value at the current scale.
 
@@ -118,10 +135,10 @@ This keeps the filesystem layout easy to scan while allowing the metadata file t
 
 ## Run Bundle Structure
 
-Each timestamped run directory should contain:
+Each canonical bundle directory should contain:
 
 ```text
-<timestamp>/
+<fingerprint>/
   run_meta.json
   summary.json
   summary.md
@@ -151,6 +168,49 @@ Each timestamped run directory should contain:
 - `report.html`
   Self-contained static visual report that can be opened locally in a browser.
 
+## Audit History
+
+Each execution attempt should write a lightweight timestamped record under `history/`:
+
+```text
+history/
+  2026-04-18T14-10-00.json
+  2026-04-18T14-20-00.json
+```
+
+Example:
+
+```json
+{
+  "timestamp": "2026-04-18T14:20:00-05:00",
+  "strategy": "mean_reversion_v1",
+  "market": "us",
+  "instrument_type": "etf",
+  "source": "yfinance",
+  "bundle_fingerprint": "a1b2c3d4",
+  "deduplicated": true,
+  "code_commit": "2a954a7"
+}
+```
+
+This preserves auditability without forcing a full duplicate bundle for every run.
+
+## Fingerprinting
+
+A canonical bundle fingerprint should be derived from the meaningful run identity and results, including:
+
+- strategy
+- market
+- instrument type
+- source
+- symbols
+- date range
+- slippage setting
+- code commit
+- structured result payload hash
+
+If a new execution resolves to an existing fingerprint, no new full bundle should be written. Only a new audit record should be added to `history/`.
+
 ## Latest Snapshot
 
 Each composite bucket should also contain a `latest/` directory:
@@ -159,18 +219,36 @@ Each composite bucket should also contain a `latest/` directory:
 results/
   mean_reversion_v1/
     us__etf__yfinance/
+      bundles/
+        a1b2c3d4/
+      history/
+        2026-04-18T14-10-00.json
+        2026-04-18T14-20-00.json
       latest/
-      2026-04-18T14-10-00/
-      2026-04-19T09-30-00/
 ```
 
-`latest/` should be a copied snapshot of the most recent completed run rather than a symlink.
+`latest/` should represent the latest resolved result for that bucket, not necessarily a newly created bundle.
+
+Recommended contents:
+
+```text
+latest/
+  latest.json
+  summary.md
+  report.html
+```
+
+`latest/` should not duplicate all raw files from the canonical bundle. It should store:
+
+- a small metadata record such as `latest.json` pointing to the active fingerprint
+- convenience presentation assets such as `summary.md` and `report.html`
 
 Reason:
 
 - simpler cross-platform behavior
 - easier inspection and sharing
 - avoids symlink edge cases on different shells, Git clients, or archive tools
+- avoids reintroducing large duplicate raw data files into the `latest/` view
 
 ## Metadata Requirements
 
@@ -257,7 +335,7 @@ Recommended contents:
 
 Important design rule:
 
-The HTML page should be generated from saved result data such as `summary.json`, `equity_curve.csv`, and `charts.json`. The page is not the source of truth; it is a presentation layer over the run bundle.
+The HTML page should be generated from saved result data such as `summary.json`, `equity_curve.csv`, and `charts.json`. The page is not the source of truth; it is a presentation layer over the canonical run bundle.
 
 ## Chart Payload
 
@@ -278,11 +356,10 @@ Results should be written only after a run completes successfully enough to prod
 
 Recommended behavior:
 
-- create the timestamped run directory
-- write structured outputs
-- generate markdown summary
-- generate HTML report
-- refresh the bucket’s `latest/` snapshot last
+- compute the run fingerprint
+- create the canonical bundle only if the fingerprint is new
+- always write a timestamped audit record
+- refresh the bucket’s `latest/` view last
 
 If a run fails midway, it should not silently overwrite `latest/`.
 
@@ -303,7 +380,9 @@ The results-saving layer should fail clearly on:
 
 - invalid or missing required metadata fields
 - missing summary inputs
-- failure to create the run directory
+- failure to compute a stable fingerprint
+- failure to create the canonical bundle directory
+- failure to write the history record
 - failure to refresh the `latest/` snapshot
 
 If presentation generation fails after structured data is already written, that failure should be explicit rather than silently ignored.
@@ -313,7 +392,9 @@ If presentation generation fails after structured data is already written, that 
 Coverage should include:
 
 - correct results path construction from strategy, market, instrument type, source, and timestamp
-- run bundle contains all expected files
+- canonical bundle contains all expected files
+- duplicate runs resolve to the same canonical fingerprint
+- duplicate runs still produce distinct history records
 - `latest/` is refreshed after a successful run
 - `summary.md` contains the expected human-readable sections
 - `report.html` contains key metric values and metadata
@@ -335,10 +416,11 @@ Because the filesystem bundle is structured and self-contained, those later feat
 
 Proceed with a filesystem-first results model that:
 
-- saves immutable timestamped run bundles
-- organizes them by `strategy / market__instrument_type__source / timestamp`
+- saves canonical bundles once per unique fingerprint
+- records every execution attempt in timestamped history
+- organizes results by `strategy / market__instrument_type__source`
 - writes both structured and human-readable outputs
-- includes a static HTML report per run
-- maintains a `latest/` snapshot for quick review
+- includes a static HTML report per unique bundle
+- maintains a lightweight `latest/` view for quick review
 
 Do not introduce a database or frontend application in the same first pass.
