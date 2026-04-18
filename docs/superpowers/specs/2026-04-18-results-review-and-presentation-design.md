@@ -6,7 +6,7 @@
 
 ## Goal
 
-Add a durable results-saving model that stores strategy backtest outputs in a way that supports both fast text review and static visual presentation without bloating storage when repeated runs produce identical results. The first version should save canonical run bundles on disk, keep a lightweight audit history for every execution attempt, organize results primarily by strategy, and generate both human-readable summaries and a browser-openable HTML report from the same underlying run data.
+Add a durable results-saving model that stores strategy backtest outputs in a way that supports fast text review, static visual presentation, and efficient LLM review without bloating storage when repeated runs produce identical results. The first version should save canonical run bundles on disk, keep a lightweight audit history for every execution attempt, organize results primarily by strategy, and generate human-readable, browser-openable, and LLM-oriented review artifacts from the same underlying run data.
 
 ## Why This Change
 
@@ -38,6 +38,7 @@ So the system needs a durable way to preserve and review runs, not just overwrit
 - Use a composite second-level bucket of `market__instrument_type__source`
 - Generate both structured and human-readable outputs for each run
 - Generate a static HTML report for local visual review
+- Generate compact LLM-oriented review artifacts for second-eye analysis
 - Maintain a `latest/` snapshot per bucket for quick access
 
 ### Out of Scope
@@ -61,6 +62,7 @@ Each unique result should produce a self-contained canonical bundle that include
 - raw CSV outputs
 - a markdown summary for text review
 - a static HTML report for visual review
+- a compact LLM review package
 
 Each execution attempt should also produce a lightweight audit record so reruns are visible without forcing duplicate bundles to be written.
 
@@ -142,6 +144,8 @@ Each canonical bundle directory should contain:
   run_meta.json
   summary.json
   summary.md
+  llm_review.json
+  llm_review.md
   trades.csv
   equity_curve.csv
   comparison.csv
@@ -157,6 +161,10 @@ Each canonical bundle directory should contain:
   Machine-readable metrics for later automation or aggregation.
 - `summary.md`
   Compact text review for terminal and editor workflows.
+- `llm_review.json`
+  Structured single-file payload optimized for model ingestion.
+- `llm_review.md`
+  Compact fixed-format text review optimized for model summarization and critique.
 - `trades.csv`
   Raw trade log.
 - `equity_curve.csv`
@@ -320,6 +328,120 @@ Without this metadata, a run can become hard to trust once you have many saved r
 
 This should be generated from the same structured results used by the visual report so the text and visual outputs cannot drift from each other.
 
+## LLM Review Output
+
+Each canonical bundle should also include two LLM-first review artifacts:
+
+```text
+llm_review.json
+llm_review.md
+```
+
+These are not replacements for raw artifacts. They are the low-friction “second-eye review package” for another model to inspect the run without having to reconstruct context across many files.
+
+### `llm_review.json`
+
+This should provide a compact structured summary of:
+
+- run identity
+- provenance
+- symbol universe
+- base metrics
+- slippage metrics
+- delta metrics
+- artifact references
+- optional precomputed flags
+
+Recommended shape:
+
+```json
+{
+  "run_identity": {
+    "strategy": "mean_reversion_v1",
+    "market": "us",
+    "instrument_type": "etf",
+    "source": "yfinance",
+    "timestamp": "2026-04-18T14:10:00-05:00",
+    "code_commit": "2a954a7"
+  },
+  "universe": {
+    "symbols": ["SPY", "IVV", "QQQ"],
+    "date_range": {
+      "start": "2021-03-22",
+      "end": "2026-04-17"
+    }
+  },
+  "metrics": {
+    "base": {},
+    "slippage": {},
+    "delta": {}
+  },
+  "flags": {
+    "has_zero_trades": false,
+    "slippage_material": true
+  },
+  "artifacts": {
+    "summary_md": "summary.md",
+    "report_html": "report.html",
+    "trades_csv": "trades.csv",
+    "equity_curve_csv": "equity_curve.csv"
+  }
+}
+```
+
+### `llm_review.md`
+
+This should be a compact, regular template intended for direct reading by either a human reviewer or another model.
+
+Recommended shape:
+
+```md
+# Run Review Package
+
+## Identity
+- Strategy: mean_reversion_v1
+- Market: us
+- Instrument: etf
+- Source: yfinance
+- Symbols: SPY, IVV, QQQ
+- Date Range: 2021-03-22 to 2026-04-17
+- Commit: 2a954a7
+
+## Base Metrics
+- Total Return: 14.01%
+- Max Drawdown: -2.54%
+- Win Rate: 79.10%
+- Average Trade Return: 0.55%
+- Number of Trades: 67
+
+## Slippage Metrics
+- Total Return: 8.39%
+- Max Drawdown: -3.64%
+- Win Rate: 74.63%
+- Average Trade Return: 0.33%
+- Number of Trades: 67
+
+## Delta
+- Total Return Delta: -5.62%
+- Max Drawdown Delta: -1.10%
+- Win Rate Delta: -4.48%
+
+## Notes
+- Slippage materially reduces returns.
+- Trade count remains unchanged between base and slippage runs.
+```
+
+### Why These Files Matter
+
+Without these files, a model acting as a second reviewer would need to inspect:
+
+- `run_meta.json`
+- `summary.json`
+- `comparison.csv`
+- sometimes `summary.md`
+
+That is possible, but it increases friction and makes model review less consistent. The `llm_review.*` files make model-assisted review a first-class workflow rather than an accidental side effect of the general artifact layout.
+
 ## Visual Review Output
 
 `report.html` should be a static single-run report designed for local browser opening.
@@ -397,6 +519,8 @@ Coverage should include:
 - duplicate runs still produce distinct history records
 - `latest/` is refreshed after a successful run
 - `summary.md` contains the expected human-readable sections
+- `llm_review.json` contains required review fields
+- `llm_review.md` contains the expected review sections
 - `report.html` contains key metric values and metadata
 - `run_meta.json` includes required provenance fields
 
@@ -420,6 +544,7 @@ Proceed with a filesystem-first results model that:
 - records every execution attempt in timestamped history
 - organizes results by `strategy / market__instrument_type__source`
 - writes both structured and human-readable outputs
+- writes first-class LLM review artifacts
 - includes a static HTML report per unique bundle
 - maintains a lightweight `latest/` view for quick review
 
