@@ -6,6 +6,18 @@ from mean_reversion.config import BacktestConfig
 from mean_reversion.reporting import build_summary_stats, compare_runs
 
 
+def test_run_backtest_rejects_frames_missing_standard_signal_columns():
+    dates = pd.date_range("2026-01-01", periods=2, freq="D", name="date")
+    market = pd.DataFrame({"open": [1, 1], "high": [1, 1], "low": [1, 1], "close": [1, 1]}, index=dates)
+    invalid = pd.DataFrame(
+        {"open": [100, 100], "high": [101, 101], "low": [99, 99], "close": [100, 100], "volume": [10, 10]},
+        index=dates,
+    )
+
+    with pytest.raises(ValueError, match="entry_signal"):
+        run_backtest({"SPY": market, "IVV": invalid, "QQQ": invalid.copy()}, BacktestConfig())
+
+
 def test_run_backtest_enters_on_next_open_and_exits_on_signal_open():
     dates = pd.date_range("2026-01-01", periods=6, freq="D", name="date")
     market = pd.DataFrame(
@@ -112,8 +124,59 @@ def test_cli_main_runs_with_monkeypatched_dependencies(monkeypatch, tmp_path):
     from mean_reversion import cli
 
     monkeypatch.setattr(cli, "BacktestConfig", lambda: BacktestConfig(output_dir=str(tmp_path)))
-    monkeypatch.setattr(cli, "download_daily_bars", lambda config: {})
-    monkeypatch.setattr(cli, "build_signal_frames", lambda bars, config: {})
+
+    class StubSource:
+        name = "yfinance"
+
+        def load_bars(self, symbols):
+            idx = pd.date_range("2026-01-01", periods=2, name="date")
+            return {
+                "SPY": pd.DataFrame(
+                    {"open": [1.0, 1.0], "high": [1.0, 1.0], "low": [1.0, 1.0], "close": [1.0, 1.0], "volume": [1, 1]},
+                    index=idx,
+                ),
+                "IVV": pd.DataFrame(
+                    {
+                        "open": [1.0, 1.0],
+                        "high": [1.0, 1.0],
+                        "low": [1.0, 1.0],
+                        "close": [1.0, 1.0],
+                        "volume": [1, 1],
+                        "entry_signal": [True, False],
+                        "exit_signal": [False, True],
+                    },
+                    index=idx,
+                ),
+                "QQQ": pd.DataFrame(
+                    {
+                        "open": [1.0, 1.0],
+                        "high": [1.0, 1.0],
+                        "low": [1.0, 1.0],
+                        "close": [1.0, 1.0],
+                        "volume": [1, 1],
+                        "entry_signal": [False, False],
+                        "exit_signal": [False, False],
+                    },
+                    index=idx,
+                ),
+            }
+
+    class StubStrategy:
+        name = "mean_reversion_v1"
+        market_symbol = "SPY"
+        trade_symbols = ("IVV", "QQQ")
+
+        def required_symbols(self):
+            return ("SPY", "IVV", "QQQ")
+
+        def prepare_frames(self, frames):
+            return frames
+
+        def build_signals(self, frames):
+            return frames
+
+    monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
+    monkeypatch.setattr(cli, "get_strategy", lambda name: StubStrategy())
     monkeypatch.setattr(
         cli,
         "run_backtest",
@@ -126,7 +189,7 @@ def test_cli_main_runs_with_monkeypatched_dependencies(monkeypatch, tmp_path):
         ),
     )
 
-    cli.main()
+    cli.main(["--strategy", "mean_reversion_v1"])
 
     assert (tmp_path / "base_summary.csv").exists()
     assert (tmp_path / "slippage_summary.csv").exists()

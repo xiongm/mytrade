@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from .config import BacktestConfig
+from .strategies.mean_reversion import validate_signal_frames
 
 
 @dataclass
@@ -18,6 +19,7 @@ def run_backtest(
     config: BacktestConfig,
     slippage_bps: float = 0.0,
 ) -> BacktestResult:
+    validate_signal_frames({symbol: frames[symbol] for symbol in config.trade_symbols})
     dates = frames[config.market_symbol].index
     cash = config.initial_cash
     open_positions: dict[str, dict[str, object]] = {}

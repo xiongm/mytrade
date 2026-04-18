@@ -1,7 +1,7 @@
 import pandas as pd
 
 from mean_reversion.config import BacktestConfig
-from mean_reversion.data import normalize_symbol_frame, validate_symbol_frames
+from mean_reversion.data_sources.base import normalize_symbol_frame, validate_ohlcv_frames
 
 
 def test_default_backtest_config_matches_strategy_spec():
@@ -38,22 +38,18 @@ def test_normalize_symbol_frame_standardizes_columns_and_index():
     assert normalized.loc[pd.Timestamp("2026-01-02"), "close"] == 100.5
 
 
-def test_validate_symbol_frames_requires_same_trading_calendar():
-    shared = pd.DatetimeIndex(["2026-01-02", "2026-01-03"], name="date")
-    shifted = pd.DatetimeIndex(["2026-01-03", "2026-01-06"], name="date")
-
-    frames = {
-        "SPY": pd.DataFrame({"close": [1, 2]}, index=shared),
-        "IVV": pd.DataFrame({"close": [1, 2]}, index=shared),
-        "QQQ": pd.DataFrame({"close": [1, 2]}, index=shifted),
-    }
+def test_validate_ohlcv_frames_rejects_missing_required_columns():
+    frame = pd.DataFrame(
+        {"open": [1.0], "high": [1.0], "close": [1.0]},
+        index=pd.date_range("2026-01-01", periods=1, name="date"),
+    )
 
     try:
-        validate_symbol_frames(frames)
+        validate_ohlcv_frames({"SPY": frame})
     except ValueError as exc:
-        assert "same date index" in str(exc)
+        assert "low" in str(exc)
     else:
-        raise AssertionError("Expected validate_symbol_frames() to reject misaligned data")
+        raise AssertionError("Expected validate_ohlcv_frames() to reject missing OHLCV columns")
 
 
 def test_normalize_symbol_frame_accepts_csv_fixture():

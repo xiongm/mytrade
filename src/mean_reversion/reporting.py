@@ -12,14 +12,23 @@ def build_summary_stats(trades: pd.DataFrame, equity_curve: pd.DataFrame) -> dic
     equity = equity_curve["equity"]
     rolling_peak = equity.cummax()
     drawdown = (equity / rolling_peak) - 1
-    wins = trades.loc[trades["return_pct"] > 0, "return_pct"]
-    losses = trades.loc[trades["return_pct"] <= 0, "return_pct"]
+    if "return_pct" in trades.columns:
+        returns = trades["return_pct"]
+        wins = trades.loc[returns > 0, "return_pct"]
+        losses = trades.loc[returns <= 0, "return_pct"]
+        win_rate = float((returns > 0).mean()) if not trades.empty else 0.0
+        average_trade_return = float(returns.mean()) if not trades.empty else 0.0
+    else:
+        wins = pd.Series(dtype=float)
+        losses = pd.Series(dtype=float)
+        win_rate = 0.0
+        average_trade_return = 0.0
 
     return {
         "total_return": float((equity.iloc[-1] / equity.iloc[0]) - 1),
         "max_drawdown": float(drawdown.min()),
-        "win_rate": float((trades["return_pct"] > 0).mean()) if not trades.empty else 0.0,
-        "average_trade_return": float(trades["return_pct"].mean()) if not trades.empty else 0.0,
+        "win_rate": win_rate,
+        "average_trade_return": average_trade_return,
         "average_win": float(wins.mean()) if not wins.empty else 0.0,
         "average_loss": float(losses.mean()) if not losses.empty else 0.0,
         "number_of_trades": int(len(trades)),
