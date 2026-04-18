@@ -161,3 +161,6 @@ def test_cli_writes_results_bundle_after_successful_run(monkeypatch, tmp_path):
     latest_json = json.loads((tmp_path / "results" / "mean_reversion_v1" / "us__etf__yfinance" / "latest" / "latest.json").read_text())
     assert latest_json["bundle_fingerprint"]
     assert (tmp_path / "results" / "mean_reversion_v1" / "us__etf__yfinance" / "latest" / "summary.md").exists()
+    assert (tmp_path / "results" / "index.html").exists()
+    index_content = (tmp_path / "results" / "index.html").read_text()
+    assert "mean_reversion_v1" in index_content

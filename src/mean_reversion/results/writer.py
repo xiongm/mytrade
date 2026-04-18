@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from .fingerprint import build_bundle_fingerprint
+from .index_generator import update_global_index
 from .models import RunContext
 from .paths import bundle_dir, history_file, latest_dir
 
@@ -44,6 +45,7 @@ def write_results_bundle(
 
     _write_history_record(root_dir, context, fingerprint, deduplicated)
     _refresh_latest_view(latest_view, context, fingerprint, canonical_dir)
+    update_global_index(root_dir)
 
     return WriteResult(fingerprint=fingerprint, bundle_dir=canonical_dir, latest_dir=latest_view, deduplicated=deduplicated)
 
