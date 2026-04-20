@@ -213,6 +213,12 @@ def _format_bool(value: bool) -> str:
     return "Yes" if value else "No"
 
 
+def _format_metric_value(metric_name: str, value: float) -> str:
+    if metric_name == "number_of_trades":
+        return str(int(round(value)))
+    return _format_percentage(value)
+
+
 def _build_identity_payload(context: RunContext) -> dict:
     return {
         "strategy": context.strategy,
@@ -504,13 +510,14 @@ def _comparison_table(comparison: pd.DataFrame) -> str:
         base = float(row.get("base", 0.0))
         slippage = float(row.get("slippage", 0.0))
         delta = float(row.get("delta", 0.0))
+        metric_name = str(metric)
         rows.append(
             f"""
             <tr>
-              <td>{escape(str(metric).replace('_', ' ').title())}</td>
-              <td>{_format_percentage(base)}</td>
-              <td>{_format_percentage(slippage)}</td>
-              <td>{_format_percentage(delta)}</td>
+              <td>{escape(metric_name.replace('_', ' ').title())}</td>
+              <td>{_format_metric_value(metric_name, base)}</td>
+              <td>{_format_metric_value(metric_name, slippage)}</td>
+              <td>{_format_metric_value(metric_name, delta)}</td>
             </tr>
             """
         )

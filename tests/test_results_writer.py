@@ -2,7 +2,7 @@ import pandas as pd
 import json
 
 from mean_reversion.results.models import RunContext
-from mean_reversion.results.writer import write_results_bundle
+from mean_reversion.results.writer import _comparison_table, write_results_bundle
 
 
 def test_write_results_bundle_creates_canonical_bundle_and_latest_view(tmp_path):
@@ -218,6 +218,17 @@ def test_report_html_contains_key_metrics_and_metadata(tmp_path):
     assert "Exit Price" in html
     assert "Exit Reason" in html
     assert "entry_rsi_threshold" not in html
+
+
+def test_report_html_formats_trade_count_as_count_not_percentage(tmp_path):
+    comparison = pd.DataFrame(
+        {"base": [67.0], "slippage": [67.0], "delta": [0.0]},
+        index=["number_of_trades"],
+    )
+    html = _comparison_table(comparison)
+
+    assert "6700.00%" not in html
+    assert ">67<" in html
 
 
 def test_latest_json_points_to_latest_resolved_fingerprint(tmp_path):
