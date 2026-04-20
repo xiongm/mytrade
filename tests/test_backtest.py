@@ -133,7 +133,11 @@ def test_build_summary_stats_returns_required_metrics():
 def test_cli_main_runs_with_monkeypatched_dependencies(monkeypatch, tmp_path):
     from mean_reversion import cli
 
-    monkeypatch.setattr(cli, "BacktestConfig", lambda: BacktestConfig(output_dir=str(tmp_path)))
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path)}),
+    )
 
     class StubSource:
         name = "yfinance"
