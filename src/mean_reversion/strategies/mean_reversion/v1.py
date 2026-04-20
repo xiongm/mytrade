@@ -17,6 +17,8 @@ class MeanReversionV1Strategy:
     rsi_window: int = 2
     entry_rsi_threshold: float = 15.0
     exit_rsi_threshold: float = 60.0
+    require_two_down_closes: bool = True
+    use_rsi_exit: bool = True
 
     def required_symbols(self) -> tuple[str, ...]:
         return (self.market_symbol, *self.trade_symbols)
@@ -49,13 +51,17 @@ class MeanReversionV1Strategy:
 
         for symbol in self.trade_symbols:
             enriched = frames[symbol].copy()
-            enriched["entry_signal"] = (
+            entry_signal = (
                 market["market_ok"]
                 & (enriched["close"] > enriched["trend_ma"])
-                & enriched["two_down_closes"]
                 & (enriched["rsi"] < self.entry_rsi_threshold)
             )
-            enriched["exit_signal"] = enriched["rsi"] > self.exit_rsi_threshold
+            if self.require_two_down_closes:
+                entry_signal = entry_signal & enriched["two_down_closes"]
+            enriched["entry_signal"] = entry_signal
+            enriched["exit_signal"] = (
+                enriched["rsi"] > self.exit_rsi_threshold if self.use_rsi_exit else False
+            )
             signal_frames[symbol] = enriched
 
         return signal_frames

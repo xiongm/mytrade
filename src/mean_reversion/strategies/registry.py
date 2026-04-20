@@ -1,15 +1,7 @@
-from .mean_reversion import (
-    MeanReversionFastExitStrategy,
-    MeanReversionStrictStrategy,
-    MeanReversionV1Strategy,
-)
+from .mean_reversion import STRATEGY_TYPES
 
 
-STRATEGY_FACTORIES = {
-    "mean_reversion_v1": MeanReversionV1Strategy,
-    "mean_reversion_strict": MeanReversionStrictStrategy,
-    "mean_reversion_fast_exit": MeanReversionFastExitStrategy,
-}
+STRATEGY_FACTORIES = {strategy_type.name: strategy_type for strategy_type in STRATEGY_TYPES}
 
 
 def list_strategy_names() -> list[str]:

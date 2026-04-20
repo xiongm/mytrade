@@ -43,11 +43,33 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = build_parser().parse_args(argv)
-    data_source = get_data_source(args.data_source)
-    strategy = get_strategy(args.strategy)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    try:
+        data_source = get_data_source(args.data_source)
+        strategy = get_strategy(args.strategy)
+    except ValueError as exc:
+        parser.error(str(exc))
 
-    config = BacktestConfig()
+    default_config = BacktestConfig()
+    config = BacktestConfig(
+        initial_cash=default_config.initial_cash,
+        market_symbol=strategy.market_symbol,
+        trade_symbols=strategy.trade_symbols,
+        lookback_years=default_config.lookback_years,
+        max_positions=default_config.max_positions,
+        max_position_weight=default_config.max_position_weight,
+        min_cash_weight=default_config.min_cash_weight,
+        max_hold_days=getattr(strategy, "max_hold_days", default_config.max_hold_days),
+        stop_loss_pct=default_config.stop_loss_pct,
+        entry_rsi_threshold=getattr(strategy, "entry_rsi_threshold", default_config.entry_rsi_threshold),
+        exit_rsi_threshold=getattr(strategy, "exit_rsi_threshold", default_config.exit_rsi_threshold),
+        market_ma_window=getattr(strategy, "market_ma_window", default_config.market_ma_window),
+        trend_ma_window=getattr(strategy, "trend_ma_window", default_config.trend_ma_window),
+        rsi_window=getattr(strategy, "rsi_window", default_config.rsi_window),
+        slippage_bps=default_config.slippage_bps,
+        output_dir=default_config.output_dir,
+    )
     bars = data_source.load_bars(strategy.required_symbols())
     prepared = strategy.prepare_frames(bars)
     signals = strategy.build_signals(prepared)

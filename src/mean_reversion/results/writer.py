@@ -42,9 +42,12 @@ def write_results_bundle(
     if not deduplicated:
         canonical_dir.mkdir(parents=True, exist_ok=True)
         _write_canonical_bundle(canonical_dir, context, base_summary, slippage_summary, comparison, trades, equity_curve)
+    else:
+        _refresh_bundle_artifacts(canonical_dir, context, base_summary, slippage_summary, comparison, equity_curve)
 
     _write_history_record(root_dir, context, fingerprint, deduplicated)
-    _refresh_latest_view(latest_view, context, fingerprint, canonical_dir)
+    charts = _build_charts_payload(equity_curve)
+    _refresh_latest_view(latest_view, context, fingerprint, base_summary, slippage_summary, comparison, charts)
     update_global_index(root_dir)
 
     return WriteResult(fingerprint=fingerprint, bundle_dir=canonical_dir, latest_dir=latest_view, deduplicated=deduplicated)
@@ -66,22 +69,36 @@ def _write_canonical_bundle(
         "slippage": slippage_summary,
         "delta": delta_summary,
     }
+
+    (canonical_dir / "run_meta.json").write_text(json.dumps(run_meta, indent=2))
+    (canonical_dir / "summary.json").write_text(json.dumps(summary, indent=2))
+    trades.to_csv(canonical_dir / "trades.csv", index=False)
+    equity_curve.to_csv(canonical_dir / "equity_curve.csv")
+    comparison.to_csv(canonical_dir / "comparison.csv")
+    
+    # Write refreshable artifacts
+    _refresh_bundle_artifacts(canonical_dir, context, base_summary, slippage_summary, comparison, equity_curve)
+
+
+def _refresh_bundle_artifacts(
+    bundle_dir: Path,
+    context: RunContext,
+    base_summary: dict,
+    slippage_summary: dict,
+    comparison: pd.DataFrame,
+    equity_curve: pd.DataFrame,
+) -> None:
     llm_review = _build_llm_review_json(context, base_summary, slippage_summary, comparison)
     summary_md = _build_summary_markdown(context, base_summary, slippage_summary, comparison)
     llm_md = _build_llm_review_markdown(llm_review)
     charts = _build_charts_payload(equity_curve)
     report_html = _build_report_html(context, base_summary, slippage_summary, comparison, charts)
 
-    (canonical_dir / "run_meta.json").write_text(json.dumps(run_meta, indent=2))
-    (canonical_dir / "summary.json").write_text(json.dumps(summary, indent=2))
-    (canonical_dir / "summary.md").write_text(summary_md)
-    (canonical_dir / "llm_review.json").write_text(json.dumps(llm_review, indent=2))
-    (canonical_dir / "llm_review.md").write_text(llm_md)
-    trades.to_csv(canonical_dir / "trades.csv", index=False)
-    equity_curve.to_csv(canonical_dir / "equity_curve.csv")
-    comparison.to_csv(canonical_dir / "comparison.csv")
-    (canonical_dir / "charts.json").write_text(json.dumps(charts, indent=2))
-    (canonical_dir / "report.html").write_text(report_html)
+    (bundle_dir / "summary.md").write_text(summary_md)
+    (bundle_dir / "llm_review.json").write_text(json.dumps(llm_review, indent=2))
+    (bundle_dir / "llm_review.md").write_text(llm_md)
+    (bundle_dir / "charts.json").write_text(json.dumps(charts, indent=2))
+    (bundle_dir / "report.html").write_text(report_html)
 
 
 def _write_history_record(root_dir: Path, context: RunContext, fingerprint: str, deduplicated: bool) -> None:
@@ -93,6 +110,7 @@ def _write_history_record(root_dir: Path, context: RunContext, fingerprint: str,
         "market": context.market,
         "instrument_type": context.instrument_type,
         "source": context.source,
+        "symbols": list(context.symbols),
         "bundle_fingerprint": fingerprint,
         "deduplicated": deduplicated,
         "code_commit": context.code_commit,
@@ -100,16 +118,20 @@ def _write_history_record(root_dir: Path, context: RunContext, fingerprint: str,
     path.write_text(json.dumps(payload, indent=2))
 
 
-def _refresh_latest_view(latest_view: Path, context: RunContext, fingerprint: str, canonical_dir: Path) -> None:
+def _refresh_latest_view(latest_view: Path, context: RunContext, fingerprint: str, base_summary: dict, slippage_summary: dict, comparison: pd.DataFrame, charts: dict) -> None:
     latest_view.mkdir(parents=True, exist_ok=True)
     payload = {
         "strategy": context.strategy,
         "timestamp": context.timestamp,
+        "symbols": list(context.symbols),
         "bundle_fingerprint": fingerprint,
     }
+    summary_md = _build_summary_markdown(context, base_summary, slippage_summary, comparison)
+    report_html = _build_report_html(context, base_summary, slippage_summary, comparison, charts)
+    
     (latest_view / "latest.json").write_text(json.dumps(payload, indent=2))
-    (latest_view / "summary.md").write_text((canonical_dir / "summary.md").read_text())
-    (latest_view / "report.html").write_text((canonical_dir / "report.html").read_text())
+    (latest_view / "summary.md").write_text(summary_md)
+    (latest_view / "report.html").write_text(report_html)
 
 
 def _format_percentage(value: float) -> str:
@@ -268,6 +290,7 @@ def _build_report_html(context: RunContext, base_summary: dict, slippage_summary
 <body>
   <h1>{context.strategy}</h1>
   <p>Market: {context.market} | Instrument: {context.instrument_type} | Source: {context.source}</p>
+  <p>Symbols: {", ".join(context.symbols)}</p>
   <div class="grid">
     <div class="card">
       <h2>Base</h2>

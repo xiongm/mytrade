@@ -35,8 +35,20 @@ def test_cli_requires_strategy_flag():
         parser.parse_args([])
 
 
+def test_cli_reports_unknown_strategy_without_traceback(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["--strategy", "does_not_exist"])
+
+    captured = capsys.readouterr()
+    assert "Unknown strategy 'does_not_exist'" in captured.err
+
+
 def test_cli_loads_strategy_symbols_from_selected_data_source(monkeypatch, tmp_path):
-    monkeypatch.setattr(cli, "BacktestConfig", lambda: BacktestConfig(output_dir=str(tmp_path)))
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path)}),
+    )
 
     requested_symbols = {}
 
@@ -93,6 +105,7 @@ def test_cli_loads_strategy_symbols_from_selected_data_source(monkeypatch, tmp_p
 
     monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
     monkeypatch.setattr(cli, "get_strategy", lambda name: StubStrategy())
+    monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
     monkeypatch.setattr(
         cli,
         "run_backtest",
@@ -112,7 +125,11 @@ def test_cli_loads_strategy_symbols_from_selected_data_source(monkeypatch, tmp_p
 
 
 def test_cli_writes_results_bundle_after_successful_run(monkeypatch, tmp_path):
-    monkeypatch.setattr(cli, "BacktestConfig", lambda: BacktestConfig(output_dir=str(tmp_path / "artifacts")))
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path / "artifacts")}),
+    )
     monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
 
     class StubSource:

@@ -27,6 +27,7 @@ def update_global_index(root_dir: Path) -> None:
                             summary = json.loads(bundle_summary_path.read_text())
                             data["metrics"] = summary.get("base", {})
                             data["market_full"] = bucket_dir.name
+                            data["symbols_str"] = ", ".join(data.get("symbols", []))
                             data["report_path"] = f"{strategy_dir.name}/{bucket_dir.name}/bundles/{data['bundle_fingerprint']}/report.html"
                             history_records.append(data)
                     except Exception: continue
@@ -41,6 +42,7 @@ def update_global_index(root_dir: Path) -> None:
                         summary = json.loads(bundle_summary_path.read_text())
                         l_data["metrics"] = summary.get("base", {})
                         l_data["market_full"] = bucket_dir.name
+                        l_data["symbols_str"] = ", ".join(l_data.get("symbols", []))
                         l_data["report_path"] = f"{strategy_dir.name}/{bucket_dir.name}/latest/report.html"
                         latest_results.append(l_data)
                 except Exception: continue
@@ -87,7 +89,7 @@ def _generate_html(recent, leaderboard):
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>Global Results Portal</title>
+    <title>Strategy Intelligence Hub</title>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; background: #f4f7f6; }}
         .container {{ max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
@@ -100,7 +102,7 @@ def _generate_html(recent, leaderboard):
 </head>
 <body>
     <div class="container">
-        <h1>Global Results Portal</h1>
+        <h1>Strategy Intelligence Hub</h1>
         <p class="subtitle">Last Updated: {now}</p>
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">

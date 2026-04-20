@@ -14,8 +14,10 @@ def test_run_backtest_rejects_frames_missing_standard_signal_columns():
         index=dates,
     )
 
+    config = BacktestConfig(trade_symbols=("IVV", "QQQ"))
+
     with pytest.raises(ValueError, match="entry_signal"):
-        run_backtest({"SPY": market, "IVV": invalid, "QQQ": invalid.copy()}, BacktestConfig())
+        run_backtest({"SPY": market, "IVV": invalid, "QQQ": invalid.copy()}, config)
 
 
 def test_run_backtest_enters_on_next_open_and_exits_on_signal_open():
@@ -43,7 +45,8 @@ def test_run_backtest_enters_on_next_open_and_exits_on_signal_open():
         index=dates,
     )
 
-    result = run_backtest({"SPY": market, "IVV": ivv, "QQQ": ivv.copy()}, BacktestConfig())
+    config = BacktestConfig(trade_symbols=("IVV", "QQQ"))
+    result = run_backtest({"SPY": market, "IVV": ivv, "QQQ": ivv.copy()}, config)
 
     assert len(result.trades) >= 1
     first_trade = result.trades.iloc[0]
@@ -69,7 +72,8 @@ def test_run_backtest_triggers_stop_loss_when_daily_low_breaches_threshold():
         index=dates,
     )
 
-    result = run_backtest({"SPY": market, "IVV": ivv, "QQQ": ivv.copy()}, BacktestConfig())
+    config = BacktestConfig(trade_symbols=("IVV", "QQQ"))
+    result = run_backtest({"SPY": market, "IVV": ivv, "QQQ": ivv.copy()}, config)
 
     assert (result.trades["exit_reason"] == "stop_loss").any()
 
@@ -91,7 +95,13 @@ def test_run_backtest_respects_cash_reserve_and_max_positions():
         },
         index=dates,
     )
-    config = BacktestConfig(initial_cash=10_000.0, max_positions=2, max_position_weight=0.40, min_cash_weight=0.20)
+    config = BacktestConfig(
+        initial_cash=10_000.0,
+        max_positions=2,
+        max_position_weight=0.40,
+        min_cash_weight=0.20,
+        trade_symbols=("IVV", "QQQ"),
+    )
 
     result = run_backtest({"SPY": market, "IVV": tradable, "QQQ": tradable.copy()}, config)
 
