@@ -13,3 +13,9 @@ class RunContext:
     date_end: str
     slippage_bps: float
     code_commit: str
+    entry_rsi_threshold: float
+    exit_rsi_threshold: float
+    max_hold_days: int
+    require_two_down_closes: bool
+    use_rsi_exit: bool
+    stop_loss_pct: float

@@ -14,6 +14,12 @@ def test_build_bundle_fingerprint_is_stable_for_same_context_and_payload():
         date_end="2026-04-17",
         slippage_bps=10.0,
         code_commit="2a954a7",
+        entry_rsi_threshold=15.0,
+        exit_rsi_threshold=60.0,
+        max_hold_days=4,
+        require_two_down_closes=True,
+        use_rsi_exit=True,
+        stop_loss_pct=0.03,
     )
     payload = {
         "base": {"total_return": 0.14, "number_of_trades": 67},
@@ -38,6 +44,12 @@ def test_build_bundle_fingerprint_changes_when_payload_changes():
         date_end="2026-04-17",
         slippage_bps=10.0,
         code_commit="2a954a7",
+        entry_rsi_threshold=15.0,
+        exit_rsi_threshold=60.0,
+        max_hold_days=4,
+        require_two_down_closes=True,
+        use_rsi_exit=True,
+        stop_loss_pct=0.03,
     )
 
     first = build_bundle_fingerprint(context, {"base": {"total_return": 0.14}})

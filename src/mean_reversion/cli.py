@@ -102,6 +102,12 @@ def main(argv: list[str] | None = None) -> None:
         date_end=str(signals[strategy.market_symbol].index.max().date()),
         slippage_bps=config.slippage_bps,
         code_commit=_git_head_short(),
+        entry_rsi_threshold=config.entry_rsi_threshold,
+        exit_rsi_threshold=config.exit_rsi_threshold,
+        max_hold_days=config.max_hold_days,
+        require_two_down_closes=getattr(strategy, "require_two_down_closes", True),
+        use_rsi_exit=getattr(strategy, "use_rsi_exit", True),
+        stop_loss_pct=config.stop_loss_pct,
     )
     write_results_bundle(
         root_dir=RESULTS_ROOT,

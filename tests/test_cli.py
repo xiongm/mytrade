@@ -181,3 +181,84 @@ def test_cli_writes_results_bundle_after_successful_run(monkeypatch, tmp_path):
     assert (tmp_path / "results" / "index.html").exists()
     index_content = (tmp_path / "results" / "index.html").read_text()
     assert "mean_reversion_v1" in index_content
+
+
+def test_cli_persists_strategy_setup_in_latest_bundle(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path / "artifacts")}),
+    )
+    monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
+
+    idx = pd.date_range("2026-01-01", periods=2, name="date")
+
+    class StubSource:
+        name = "yfinance"
+
+        def load_bars(self, symbols):
+            return {
+                "SPY": pd.DataFrame({"open": [1.0, 1.0], "high": [1.0, 1.0], "low": [1.0, 1.0], "close": [1.0, 1.0], "volume": [1, 1]}, index=idx),
+                "IVV": pd.DataFrame({"open": [1.0, 1.0], "high": [1.0, 1.0], "low": [1.0, 1.0], "close": [1.0, 1.0], "volume": [1, 1], "entry_signal": [True, False], "exit_signal": [False, True]}, index=idx),
+                "QQQ": pd.DataFrame({"open": [1.0, 1.0], "high": [1.0, 1.0], "low": [1.0, 1.0], "close": [1.0, 1.0], "volume": [1, 1], "entry_signal": [False, False], "exit_signal": [False, False]}, index=idx),
+            }
+
+    class StubStrategy:
+        name = "mean_reversion_v1"
+        market_symbol = "SPY"
+        trade_symbols = ("IVV", "QQQ")
+        market = "us"
+        instrument_type = "etf"
+        entry_rsi_threshold = 20.0
+        exit_rsi_threshold = 70.0
+        max_hold_days = 6
+        require_two_down_closes = False
+        use_rsi_exit = False
+
+        def required_symbols(self):
+            return ("SPY", "IVV", "QQQ")
+
+        def prepare_frames(self, frames):
+            return frames
+
+        def build_signals(self, frames):
+            return frames
+
+    monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
+    monkeypatch.setattr(cli, "get_strategy", lambda name: StubStrategy())
+    monkeypatch.setattr(cli, "_git_head_short", lambda: "2a954a7")
+    monkeypatch.setattr(
+        cli,
+        "run_backtest",
+        lambda frames, config, slippage_bps=0.0: BacktestResult(
+            trades=pd.DataFrame(
+                [
+                    {
+                        "symbol": "IVV",
+                        "entry_date": "2026-01-01",
+                        "exit_date": "2026-01-02",
+                        "entry_price": 100.0,
+                        "exit_price": 101.0,
+                        "shares": 10,
+                        "pnl": 10.0,
+                        "return_pct": 0.01,
+                        "exit_reason": "signal",
+                    }
+                ]
+            ),
+            equity_curve=pd.DataFrame(
+                {"cash": [10_000.0, 0.0], "positions_value": [0.0, 10_100.0], "equity": [10_000.0, 10_100.0]},
+                index=idx,
+            ),
+        ),
+    )
+
+    cli.main(["--strategy", "mean_reversion_v1"])
+
+    run_meta = json.loads(next((tmp_path / "results").glob("**/run_meta.json")).read_text())
+    assert run_meta["entry_rsi_threshold"] == 20.0
+    assert run_meta["exit_rsi_threshold"] == 70.0
+    assert run_meta["max_hold_days"] == 6
+    assert run_meta["require_two_down_closes"] is False
+    assert run_meta["use_rsi_exit"] is False
+    assert run_meta["stop_loss_pct"] == 0.03
