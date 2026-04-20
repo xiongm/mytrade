@@ -5,3 +5,9 @@ __pycache__/
 *.pyo
 *.egg-info/
 .worktrees/
+.superpowers/
+artifacts/
+results/
+src/mean_reversion/strategies/mean_reversion/results/
+src/mean_reversion/strategies/mean_reversion/artifacts/
+tags
