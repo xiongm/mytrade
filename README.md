@@ -1,5 +1,9 @@
 # MyTrade
 
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue.svg)](./pyproject.toml)
+[![Tests](https://img.shields.io/badge/tests-68%20passing-brightgreen.svg)](#development)
+[![License](https://img.shields.io/badge/license-MIT-black.svg)](./LICENSE)
+
 A research-first backtesting project for systematic mean reversion strategies across equities and crypto.
 
 The current codebase is designed around three ideas:
@@ -14,6 +18,17 @@ Right now the repo supports:
 - daily crypto mean reversion variants
 - `yfinance`, CSV, and Parquet data sources
 - HTML and artifact-based result bundles for review
+
+## Why This Repo Exists
+
+The project is built for a pragmatic workflow:
+
+- research ideas quickly
+- backtest them reproducibly
+- review results in a structured way
+- move toward signal generation before full automation
+
+It is intentionally optimized for strategy iteration rather than broker integration.
 
 ## Status
 
@@ -80,6 +95,18 @@ results/                      generated result bundles and latest views
 artifacts/                    generated flat output artifacts
 docs/                         handoff docs, specs, and implementation plans
 ```
+
+## At a Glance
+
+| Area | Current Support |
+|---|---|
+| Markets | US equities / ETFs, spot crypto |
+| Bar frequency | Daily |
+| Data sources | `yfinance`, CSV, Parquet |
+| Strategy families | Equity mean reversion, crypto mean reversion |
+| Position sizing | Whole shares for equities, fractional enabled for crypto |
+| Outputs | CSV artifacts, result bundles, HTML reports, global index |
+| Execution | Backtest only |
 
 ## Requirements
 
@@ -319,6 +346,18 @@ The intended progression is:
 - daily signal generation
 - manual execution
 - optional future automation
+
+## License
+
+This project is released under the [MIT License](./LICENSE).
+
+Why MIT fits this repo:
+
+- anyone can use, modify, and redistribute the code
+- there are no strong usage restrictions
+- your copyright notice stays with the code
+
+If your only real requirement is “people can use it freely, but my name should remain attached,” MIT is the standard fit.
 
 ## Notes on Signal Generation
 
