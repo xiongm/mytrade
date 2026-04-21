@@ -58,6 +58,28 @@ def test_yfinance_source_normalizes_downloaded_frames(monkeypatch):
     assert list(frames["SPY"].columns) == ["open", "high", "low", "close", "volume"]
 
 
+def test_yfinance_source_accepts_crypto_symbols(monkeypatch):
+    raw = pd.DataFrame(
+        {
+            "Date": ["2026-01-02", "2026-01-03"],
+            "Open": [40_000.0, 40_500.0],
+            "High": [40_500.0, 41_000.0],
+            "Low": [39_500.0, 40_000.0],
+            "Close": [40_200.0, 40_800.0],
+            "Volume": [1_000, 1_100],
+        }
+    )
+
+    source = YFinanceDataSource()
+    monkeypatch.setattr(source, "_download_symbol", lambda symbol: raw)
+
+    frames = source.load_bars(("BTC-USD", "ETH-USD"))
+
+    assert sorted(frames) == ["BTC-USD", "ETH-USD"]
+    assert frames["BTC-USD"].index.name == "date"
+    assert list(frames["ETH-USD"].columns) == ["open", "high", "low", "close", "volume"]
+
+
 def test_csv_source_loads_one_file_per_symbol_fixture():
     source = CsvDataSource(root_dir="tests/fixtures/csv_source")
 

@@ -3,7 +3,8 @@ from dataclasses import dataclass
 import pandas as pd
 import pytest
 
-from mean_reversion.strategies.mean_reversion import STRATEGY_TYPES
+from mean_reversion.strategies.mean_reversion import STRATEGY_TYPES as EQUITY_STRATEGY_TYPES
+from mean_reversion.strategies.mean_reversion_crypto import STRATEGY_TYPES as CRYPTO_STRATEGY_TYPES
 from mean_reversion.strategies.registry import get_strategy, list_strategy_names
 from mean_reversion.strategies.mean_reversion.base import validate_signal_frames
 from mean_reversion.strategies.mean_reversion.entry_10 import MeanReversionEntry10Strategy
@@ -13,12 +14,21 @@ from mean_reversion.strategies.mean_reversion.fixed_exit_3 import MeansREversion
 from mean_reversion.strategies.mean_reversion.fast_exit import MeanReversionFastExitStrategy
 from mean_reversion.strategies.mean_reversion.strict import MeanReversionStrictStrategy
 from mean_reversion.strategies.mean_reversion.v1 import MeanReversionV1Strategy
+from mean_reversion.strategies.mean_reversion_crypto.v1 import MeanReversionCryptoV1Strategy
 
 
 def test_mean_reversion_v1_declares_required_symbols():
     strategy = MeanReversionV1Strategy()
 
     assert strategy.required_symbols() == ("SPY", "IVV", "QQQ")
+
+
+def test_mean_reversion_crypto_v1_declares_required_symbols():
+    strategy = MeanReversionCryptoV1Strategy()
+
+    assert strategy.required_symbols() == ("BTC-USD", "ETH-USD")
+    assert strategy.market == "crypto"
+    assert strategy.instrument_type == "spot"
 
 
 def test_validate_signal_frames_rejects_missing_entry_signal():
@@ -54,6 +64,11 @@ def test_strategy_registry_exposes_mean_reversion_exit_70():
     assert get_strategy("mean_reversion_exit_70").exit_rsi_threshold == 70.0
 
 
+def test_strategy_registry_exposes_mean_reversion_crypto_v1():
+    assert "mean_reversion_crypto_v1" in list_strategy_names()
+    assert get_strategy("mean_reversion_crypto_v1").trade_symbols == ("ETH-USD",)
+
+
 def test_mean_reversion_entry_20_uses_looser_entry_threshold_than_v1():
     strategy = MeanReversionEntry20Strategy()
 
@@ -80,7 +95,10 @@ def test_mean_reversion_fixed_exit_3_uses_entry_20_and_time_exit_only():
 
 
 def test_strategy_registry_derives_names_from_exported_strategy_types():
-    assert sorted(strategy.name for strategy in STRATEGY_TYPES) == list_strategy_names()
+    expected_names = sorted(
+        strategy.name for strategy in [*EQUITY_STRATEGY_TYPES, *CRYPTO_STRATEGY_TYPES]
+    )
+    assert expected_names == list_strategy_names()
     assert get_strategy("mean_reversion_entry_20").entry_rsi_threshold == 20.0
     assert get_strategy("mean_reversion_entry_10").entry_rsi_threshold == 10.0
     assert get_strategy("mean_reversion_exit_6").max_hold_days == 6
@@ -168,3 +186,22 @@ def test_strategy_can_disable_rsi_exit():
     signals = strategy.build_signals({"SPY": market, "IVV": symbol, "QQQ": symbol.copy()})
 
     assert bool(signals["IVV"].iloc[0]["exit_signal"]) is False
+
+
+def test_mean_reversion_crypto_v1_can_enter_without_market_filter():
+    strategy = MeanReversionCryptoV1Strategy()
+    dates = pd.date_range("2026-01-01", periods=1, name="date")
+    market = pd.DataFrame({"market_ok": [True]}, index=dates)
+    eth = pd.DataFrame(
+        {
+            "close": [100.0],
+            "trend_ma": [90.0],
+            "two_down_closes": [False],
+            "rsi": [10.0],
+        },
+        index=dates,
+    )
+
+    signals = strategy.build_signals({"BTC-USD": market, "ETH-USD": eth})
+
+    assert bool(signals["ETH-USD"].iloc[0]["entry_signal"]) is True

@@ -262,3 +262,59 @@ def test_cli_persists_strategy_setup_in_latest_bundle(monkeypatch, tmp_path):
     assert run_meta["require_two_down_closes"] is False
     assert run_meta["use_rsi_exit"] is False
     assert run_meta["stop_loss_pct"] == 0.03
+
+
+def test_cli_runs_mean_reversion_crypto_v1_and_writes_crypto_results(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path / "artifacts")}),
+    )
+    monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
+    monkeypatch.setattr(cli, "_git_head_short", lambda: "2a954a7")
+
+    idx = pd.date_range("2026-01-01", periods=3, name="date")
+
+    class StubSource:
+        name = "yfinance"
+
+        def load_bars(self, symbols):
+            assert symbols == ("BTC-USD", "ETH-USD")
+            return {
+                "BTC-USD": pd.DataFrame(
+                    {
+                        "open": [40_000.0, 40_200.0, 40_100.0],
+                        "high": [40_300.0, 40_400.0, 40_500.0],
+                        "low": [39_800.0, 39_900.0, 40_000.0],
+                        "close": [40_100.0, 40_000.0, 40_200.0],
+                        "volume": [1_000, 1_100, 1_050],
+                    },
+                    index=idx,
+                ),
+                "ETH-USD": pd.DataFrame(
+                    {
+                        "open": [2_000.0, 1_980.0, 2_010.0],
+                        "high": [2_020.0, 2_000.0, 2_030.0],
+                        "low": [1_970.0, 1_960.0, 2_000.0],
+                        "close": [1_990.0, 1_970.0, 2_020.0],
+                        "volume": [500, 550, 525],
+                    },
+                    index=idx,
+                ),
+            }
+
+    monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
+
+    cli.main(["--strategy", "mean_reversion_crypto_v1"])
+
+    latest_json = json.loads(
+        (
+            tmp_path
+            / "results"
+            / "mean_reversion_crypto_v1"
+            / "crypto__spot__yfinance"
+            / "latest"
+            / "latest.json"
+        ).read_text()
+    )
+    assert latest_json["strategy"] == "mean_reversion_crypto_v1"

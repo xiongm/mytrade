@@ -1,7 +1,11 @@
-from .mean_reversion import STRATEGY_TYPES
+from .mean_reversion import STRATEGY_TYPES as EQUITY_STRATEGY_TYPES
+from .mean_reversion_crypto import STRATEGY_TYPES as CRYPTO_STRATEGY_TYPES
 
 
-STRATEGY_FACTORIES = {strategy_type.name: strategy_type for strategy_type in STRATEGY_TYPES}
+STRATEGY_FACTORIES = {
+    strategy_type.name: strategy_type
+    for strategy_type in [*EQUITY_STRATEGY_TYPES, *CRYPTO_STRATEGY_TYPES]
+}
 
 
 def list_strategy_names() -> list[str]:
