@@ -10,6 +10,7 @@ class BacktestConfig:
     max_positions: int = 2
     max_position_weight: float = 0.40
     min_cash_weight: float = 0.20
+    allow_fractional_shares: bool = False
     max_hold_days: int = 4
     stop_loss_pct: float = 0.03
     entry_rsi_threshold: float = 15.0

@@ -89,7 +89,11 @@ def run_backtest(
                 continue
 
             entry_open = float(frames[symbol].iloc[i + 1]["open"]) * (1 + slippage_bps / 10_000)
-            shares = int(available_for_position // entry_open)
+            shares = _position_size(
+                available_for_position,
+                entry_open,
+                allow_fractional_shares=config.allow_fractional_shares,
+            )
             if shares <= 0:
                 continue
 
@@ -122,7 +126,7 @@ def _close_trade(
     exit_reason: str,
 ) -> dict[str, object]:
     entry_price = float(position["entry_price"])
-    shares = int(position["shares"])
+    shares = float(position["shares"])
     pnl = shares * (exit_price - entry_price)
     return {
         "symbol": symbol,
@@ -135,3 +139,14 @@ def _close_trade(
         "return_pct": (exit_price / entry_price) - 1,
         "exit_reason": exit_reason,
     }
+
+
+def _position_size(
+    available_for_position: float,
+    entry_open: float,
+    *,
+    allow_fractional_shares: bool,
+) -> float:
+    if allow_fractional_shares:
+        return available_for_position / entry_open
+    return float(int(available_for_position // entry_open))

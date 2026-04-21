@@ -109,6 +109,39 @@ def test_run_backtest_respects_cash_reserve_and_max_positions():
     assert result.equity_curve["cash"].min() >= 2_000.0
 
 
+def test_run_backtest_can_open_fractional_position_when_enabled():
+    dates = pd.date_range("2026-01-01", periods=5, freq="D", name="date")
+    market = pd.DataFrame(
+        {"market_ok": [True] * 5, "open": [1] * 5, "high": [1] * 5, "low": [1] * 5, "close": [1] * 5},
+        index=dates,
+    )
+    btc = pd.DataFrame(
+        {
+            "open": [40_000, 40_500, 41_000, 42_000, 43_000],
+            "high": [40_500, 41_000, 41_500, 42_500, 43_500],
+            "low": [39_500, 40_000, 40_500, 41_500, 42_500],
+            "close": [40_100, 40_800, 41_200, 42_200, 43_200],
+            "entry_signal": [True, False, False, False, False],
+            "exit_signal": [False, False, True, False, False],
+        },
+        index=dates,
+    )
+
+    config = BacktestConfig(
+        initial_cash=10_000.0,
+        max_positions=1,
+        max_position_weight=0.40,
+        min_cash_weight=0.20,
+        trade_symbols=("BTC-USD",),
+        allow_fractional_shares=True,
+    )
+
+    result = run_backtest({"SPY": market, "BTC-USD": btc}, config)
+
+    assert len(result.trades) == 1
+    assert 0 < float(result.trades.iloc[0]["shares"]) < 1
+
+
 def test_build_summary_stats_returns_required_metrics():
     trades = pd.DataFrame(
         [

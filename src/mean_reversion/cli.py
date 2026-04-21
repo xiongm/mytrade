@@ -60,6 +60,7 @@ def main(argv: list[str] | None = None) -> None:
         max_positions=default_config.max_positions,
         max_position_weight=default_config.max_position_weight,
         min_cash_weight=default_config.min_cash_weight,
+        allow_fractional_shares=getattr(strategy, "allow_fractional_shares", default_config.allow_fractional_shares),
         max_hold_days=getattr(strategy, "max_hold_days", default_config.max_hold_days),
         stop_loss_pct=default_config.stop_loss_pct,
         entry_rsi_threshold=getattr(strategy, "entry_rsi_threshold", default_config.entry_rsi_threshold),

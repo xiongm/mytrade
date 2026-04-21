@@ -15,6 +15,7 @@ from mean_reversion.strategies.mean_reversion.fast_exit import MeanReversionFast
 from mean_reversion.strategies.mean_reversion.strict import MeanReversionStrictStrategy
 from mean_reversion.strategies.mean_reversion.v1 import MeanReversionV1Strategy
 from mean_reversion.strategies.mean_reversion_crypto.v1 import MeanReversionCryptoV1Strategy
+from mean_reversion.strategies.mean_reversion_crypto.btc_v1 import MeanReversionCryptoBTCV1Strategy
 
 
 def test_mean_reversion_v1_declares_required_symbols():
@@ -29,6 +30,14 @@ def test_mean_reversion_crypto_v1_declares_required_symbols():
     assert strategy.required_symbols() == ("BTC-USD", "ETH-USD")
     assert strategy.market == "crypto"
     assert strategy.instrument_type == "spot"
+
+
+def test_mean_reversion_crypto_btc_v1_declares_required_symbols():
+    strategy = MeanReversionCryptoBTCV1Strategy()
+
+    assert strategy.required_symbols() == ("BTC-USD", "BTC-USD")
+    assert strategy.trade_symbols == ("BTC-USD",)
+    assert strategy.use_market_filter is False
 
 
 def test_validate_signal_frames_rejects_missing_entry_signal():
@@ -67,6 +76,11 @@ def test_strategy_registry_exposes_mean_reversion_exit_70():
 def test_strategy_registry_exposes_mean_reversion_crypto_v1():
     assert "mean_reversion_crypto_v1" in list_strategy_names()
     assert get_strategy("mean_reversion_crypto_v1").trade_symbols == ("ETH-USD",)
+
+
+def test_strategy_registry_exposes_mean_reversion_crypto_btc_v1():
+    assert "mean_reversion_crypto_btc_v1" in list_strategy_names()
+    assert get_strategy("mean_reversion_crypto_btc_v1").trade_symbols == ("BTC-USD",)
 
 
 def test_mean_reversion_entry_20_uses_looser_entry_threshold_than_v1():

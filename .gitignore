@@ -11,3 +11,4 @@ results/
 src/mean_reversion/strategies/mean_reversion/results/
 src/mean_reversion/strategies/mean_reversion/artifacts/
 tags
+.DS_Store

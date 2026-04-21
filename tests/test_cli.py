@@ -318,3 +318,118 @@ def test_cli_runs_mean_reversion_crypto_v1_and_writes_crypto_results(monkeypatch
         ).read_text()
     )
     assert latest_json["strategy"] == "mean_reversion_crypto_v1"
+
+
+def test_cli_runs_mean_reversion_crypto_btc_v1_and_writes_crypto_results(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path / "artifacts")}),
+    )
+    monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
+    monkeypatch.setattr(cli, "_git_head_short", lambda: "2a954a7")
+
+    idx = pd.date_range("2026-01-01", periods=3, name="date")
+
+    class StubSource:
+        name = "yfinance"
+
+        def load_bars(self, symbols):
+            assert symbols == ("BTC-USD", "BTC-USD")
+            return {
+                "BTC-USD": pd.DataFrame(
+                    {
+                        "open": [40_000.0, 40_200.0, 40_100.0],
+                        "high": [40_300.0, 40_400.0, 40_500.0],
+                        "low": [39_800.0, 39_900.0, 40_000.0],
+                        "close": [40_100.0, 40_000.0, 40_200.0],
+                        "volume": [1_000, 1_100, 1_050],
+                    },
+                    index=idx,
+                ),
+            }
+
+    monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
+
+    cli.main(["--strategy", "mean_reversion_crypto_btc_v1"])
+
+    latest_json = json.loads(
+        (
+            tmp_path
+            / "results"
+            / "mean_reversion_crypto_btc_v1"
+            / "crypto__spot__yfinance"
+            / "latest"
+            / "latest.json"
+        ).read_text()
+    )
+    assert latest_json["strategy"] == "mean_reversion_crypto_btc_v1"
+
+
+def test_cli_passes_fractional_share_config_for_crypto_strategy(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        cli,
+        "BacktestConfig",
+        lambda **kwargs: BacktestConfig(**{**kwargs, "output_dir": str(tmp_path / "artifacts")}),
+    )
+    monkeypatch.setattr(cli, "RESULTS_ROOT", tmp_path / "results")
+    monkeypatch.setattr(cli, "_git_head_short", lambda: "2a954a7")
+
+    idx = pd.date_range("2026-01-01", periods=2, name="date")
+    seen = {}
+
+    class StubSource:
+        name = "yfinance"
+
+        def load_bars(self, symbols):
+            return {
+                "BTC-USD": pd.DataFrame(
+                    {
+                        "open": [40_000.0, 40_500.0],
+                        "high": [40_300.0, 40_800.0],
+                        "low": [39_800.0, 40_200.0],
+                        "close": [40_100.0, 40_600.0],
+                        "volume": [1_000, 1_100],
+                        "entry_signal": [True, False],
+                        "exit_signal": [False, True],
+                    },
+                    index=idx,
+                ),
+            }
+
+    class StubStrategy:
+        name = "mean_reversion_crypto_btc_v1"
+        market = "crypto"
+        instrument_type = "spot"
+        market_symbol = "BTC-USD"
+        trade_symbols = ("BTC-USD",)
+        allow_fractional_shares = True
+        entry_rsi_threshold = 15.0
+        exit_rsi_threshold = 60.0
+        max_hold_days = 4
+        require_two_down_closes = False
+        use_rsi_exit = True
+
+        def required_symbols(self):
+            return ("BTC-USD", "BTC-USD")
+
+        def prepare_frames(self, frames):
+            return frames
+
+        def build_signals(self, frames):
+            return frames
+
+    def fake_run_backtest(frames, config, slippage_bps=0.0):
+        seen["allow_fractional_shares"] = config.allow_fractional_shares
+        return BacktestResult(
+            trades=pd.DataFrame([{"symbol": "BTC-USD", "shares": 0.1, "return_pct": 0.01, "pnl": 10.0}]),
+            equity_curve=pd.DataFrame({"equity": [10_000.0, 10_100.0]}, index=idx),
+        )
+
+    monkeypatch.setattr(cli, "get_data_source", lambda name: StubSource())
+    monkeypatch.setattr(cli, "get_strategy", lambda name: StubStrategy())
+    monkeypatch.setattr(cli, "run_backtest", fake_run_backtest)
+
+    cli.main(["--strategy", "mean_reversion_crypto_btc_v1"])
+
+    assert seen["allow_fractional_shares"] is True

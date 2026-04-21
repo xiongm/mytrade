@@ -14,6 +14,7 @@ class MeanReversionCryptoStrategyBase:
     instrument_type: str = "spot"
     market_symbol: str = "BTC-USD"
     trade_symbols: tuple[str, ...] = ("ETH-USD",)
+    allow_fractional_shares: bool = True
     market_ma_window: int = 200
     trend_ma_window: int = 50
     rsi_window: int = 2
@@ -38,6 +39,11 @@ class MeanReversionCryptoStrategyBase:
 
         prepared = {self.market_symbol: market}
         for symbol in self.trade_symbols:
+            if symbol == self.market_symbol:
+                prepared[symbol] = market.rename(
+                    columns={f"rsi_{self.rsi_window}": "rsi"}
+                ).assign(trend_ma=market["market_ma"])
+                continue
             prepared[symbol] = enrich_symbol_frame(
                 frames[symbol],
                 ma_window=self.trend_ma_window,
